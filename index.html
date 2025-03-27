@@ -1,0 +1,20 @@
+<html>
+<head>
+    <title>XP計算ツール</title>
+    <script src="./script.js"></script>	
+    <meta charset="utf-8">
+</head>
+<body>
+    出発地：<input type="text" id="origin" placeholder="出発地の3レター" />
+    目的地：<input type="text" id="destination" placeholder="到着地の3レター" />
+    座席クラス：<select id="class">
+        <option value="Economy">エコノミー</option>
+        <option value="PremiumEconomy">プレミアムエコノミー</option>
+        <option value="Business">ビジネス</option>
+        <option value="First">ファースト</option>
+    </select>
+    飛行機の金額：<input type="number" id="price" placeholder="飛行機の金額" />
+    <button onclick="calc()">計算</button>
+    <div id="result"></div>
+</body>
+</html>
