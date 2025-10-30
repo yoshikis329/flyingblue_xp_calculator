@@ -1,6 +1,41 @@
+const xpTable = {
+    "Domestic": {
+        "Economy": 2,
+        "PremiumEconomy": 4,
+        "Business": 6,
+        "First": 10
+    },
+    "Medium": {
+        "Economy": 5,
+        "PremiumEconomy": 10,
+        "Business": 15,
+        "First": 25
+    },
+    "Long 1": {
+        "Economy": 8,
+        "PremiumEconomy": 16,
+        "Business": 24,
+        "First": 40
+    },
+    "Long 2": {
+        "Economy": 10,
+        "PremiumEconomy": 20,
+        "Business": 30,
+        "First": 50
+    },
+    "Long 3": {
+        "Economy": 12,
+        "PremiumEconomy": 24,
+        "Business": 36,
+        "First": 60
+    }
+};
+
+
 const calc = async () => {
     const origin = document.getElementById('origin').value;
     const destination = document.getElementById('destination').value;
+    const classType = document.getElementById('classType').value;
     
     console.log(`Calculating route: ${origin} -> ${destination}`);
     
@@ -31,7 +66,7 @@ const calc = async () => {
                 const data = await response3.json();
                 console.log('Success with corsproxy.io:', data);
                 if (data && data.length > 0) {
-                    createResultElement(data[0]);
+                    createResultElement(data[0], classType);
                     return;
                 }
             }
@@ -54,7 +89,7 @@ const createErrorElement = () => {
     document.getElementById('result').appendChild(errorElement);
 }
 
-const createResultElement = (data) => {
+const createResultElement = (distanceCategory, classType) => {
     // ローディング表示をクリア
     document.getElementById('result').innerHTML = '';
     
@@ -69,7 +104,7 @@ const createResultElement = (data) => {
     distanceLabelTd.style.border = '1px solid black';
     distanceLabelTd.style.padding = '8px';
     const distanceValueTd = document.createElement('td');
-    distanceValueTd.innerText = data || 'データなし';
+    distanceValueTd.innerText = distanceCategory || 'データなし';
     distanceValueTd.style.border = '1px solid black';
     distanceValueTd.style.padding = '8px';
     distanceTr.appendChild(distanceLabelTd);
@@ -82,8 +117,9 @@ const createResultElement = (data) => {
     xpLabelTd.innerText = 'XP';
     xpLabelTd.style.border = '1px solid black';
     xpLabelTd.style.padding = '8px';
+
     // TODO：XP仮置きなので計算する
-    const xp = 10;
+    const xp = xpTable[distanceCategory][classType] || 0;
     const xpValueTd = document.createElement('td');
     xpValueTd.innerText = xp;
     xpValueTd.style.border = '1px solid black';
