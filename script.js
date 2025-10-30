@@ -1,7 +1,7 @@
 const calc = async () => {
     const origin = document.getElementById('origin').value;
     const destination = document.getElementById('destination').value;
-    const response = await fetch(`https://www.flyingblue.com/kamino/xp-estimation/programme?origin=${origin}&destination=${destination}&lang=no&market=NO`, {
+    const response = await fetch(`https://www.flyingblue.com/kamino/xp-estimation/programme?origin=${origin}&destination=${destination}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
