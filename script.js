@@ -114,7 +114,7 @@ const createResultElement = (distanceCategory, classType) => {
     // XPの行
     const XpTr = document.createElement('tr');
     const xpLabelTd = document.createElement('td');
-    xpLabelTd.innerText = 'XP';
+    xpLabelTd.innerText = '片道あたりのXP';
     xpLabelTd.style.border = '1px solid black';
     xpLabelTd.style.padding = '8px';
 
