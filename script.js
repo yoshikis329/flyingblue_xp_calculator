@@ -122,13 +122,13 @@ const createLoadingElement = () => {
 }
 
 const createErrorElement = () => {
+    document.getElementById('result').innerHTML = '';
     const errorElement = document.createElement('p');
     errorElement.innerText = 'データの取得に失敗しました。';
     document.getElementById('result').appendChild(errorElement);
 }
 
 const createResultElement = (distanceCategory, classType, xp, pricePerXp) => {
-    // ローディング表示をクリア
     document.getElementById('result').innerHTML = '';
     
     const tableElement = document.createElement('table');
