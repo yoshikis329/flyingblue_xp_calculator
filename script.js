@@ -67,6 +67,8 @@ const calc = async () => {
         return;
     }
 
+    console.log(`Calculating route: ${origin} -> ${destination}`);
+
     const distanceCategory = await getDistanceCategory(origin, destination, classType);
 
     if (distanceCategory instanceof Error) {
