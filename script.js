@@ -62,8 +62,10 @@ const calc = async () => {
             createErrorElement();
             return;
         }
-        const {xp, pricePerXp} = xPAndPricePerXP;
-        createResultElement(distanceCategory, classType, xp, pricePerXp);
+
+        // ローディング表示をクリア
+        document.getElementById('result').innerHTML = '';
+        createResultElement(distanceCategory, classType, xPAndPricePerXP.xp, xPAndPricePerXP.pricePerXp);
         return;
     }
 
@@ -76,15 +78,8 @@ const calc = async () => {
         return;
     }
 
-
     const xp = getXp(distanceCategory, classType);
     const pricePerXp = calcPricePerXp(xp);
-
-    createResultElement(distanceCategory, classType, xp, pricePerXp);
-
-    // ローディング表示をクリア
-    document.getElementById('result').innerHTML = '';
-
 
     createResultElement(distanceCategory, classType, xp, pricePerXp);
 }
@@ -104,7 +99,6 @@ const getDistanceCategory = async (origin, destination, classType) => {
                 const data = await response.json();
                 console.log('Success with corsproxy.io:', data);
                 if (data && data.length > 0) {
-                    createResultElement(data[0], classType);
                     return data[0];
                 }
             }
