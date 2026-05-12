@@ -52,12 +52,12 @@ const calc = async () => {
 
     if (via) {
         console.log(`Calculating route: ${origin} -> ${via} -> ${destination}`);
-        const xPAndPricePerXP = await calcXPAndPricePerXP(origin, via, destination, classType);
-        if (xPAndPricePerXP instanceof Error) {
+        const resultForXpTable = await calcXPAndPricePerXP(origin, via, destination, classType);
+        if (resultForXpTable instanceof Error) {
             createErrorElement();
             return;
         }
-        createResultElement(distanceCategory, classType, xPAndPricePerXP.xp, xPAndPricePerXP.pricePerXp);
+        createResultElement(resultForXpTable.distanceCategory, classType, resultForXpTable.xp, resultForXpTable.pricePerXp);
         return;
     }
 
@@ -111,7 +111,7 @@ const calcXPAndPricePerXP = async (origin, via, destination, classType) => {
     const xpViaDestination = getXp(viaDestinationDistanceCategory, classType);
     const xp = xpOriginVia + xpViaDestination;
     const pricePerXp = calcPricePerXp(xp);
-    return {xp, pricePerXp};
+    return {distanceCategory: `${originViaDistanceCategory} + ${viaDestinationDistanceCategory}`, xp, pricePerXp};
 }
 
 const createLoadingElement = () => {
