@@ -47,13 +47,8 @@ const calc = async () => {
 
     console.log(`Calculating route: ${origin} -> ${destination}`);
     
-    // 結果エリアをクリア
-    document.getElementById('result').innerHTML = '';
-    
     // ローディング表示
-    const loadingElement = document.createElement('p');
-    loadingElement.innerText = '計算中...';
-    document.getElementById('result').appendChild(loadingElement);
+    createLoadingElement();
 
     if (via) {
         console.log(`Calculating route: ${origin} -> ${via} -> ${destination}`);
@@ -62,9 +57,6 @@ const calc = async () => {
             createErrorElement();
             return;
         }
-
-        // ローディング表示をクリア
-        document.getElementById('result').innerHTML = '';
         createResultElement(distanceCategory, classType, xPAndPricePerXP.xp, xPAndPricePerXP.pricePerXp);
         return;
     }
@@ -72,15 +64,12 @@ const calc = async () => {
     console.log(`Calculating route: ${origin} -> ${destination}`);
 
     const distanceCategory = await getDistanceCategory(origin, destination, classType);
-
     if (distanceCategory instanceof Error) {
         createErrorElement();
         return;
     }
-
     const xp = getXp(distanceCategory, classType);
     const pricePerXp = calcPricePerXp(xp);
-
     createResultElement(distanceCategory, classType, xp, pricePerXp);
 }
 
@@ -123,6 +112,13 @@ const calcXPAndPricePerXP = async (origin, via, destination, classType) => {
     const xp = xpOriginVia + xpViaDestination;
     const pricePerXp = calcPricePerXp(xp);
     return {xp, pricePerXp};
+}
+
+const createLoadingElement = () => {
+    document.getElementById('result').innerHTML = '';    
+    const loadingElement = document.createElement('p');
+    loadingElement.innerText = '計算中...';
+    document.getElementById('result').appendChild(loadingElement);
 }
 
 const createErrorElement = () => {
