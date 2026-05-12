@@ -86,31 +86,26 @@ const calc = async () => {
 
 
 const getDistanceCategory = async (origin, destination, classType) => {
+    // 複数のCORSプロキシを順番に試す
+    const apiUrl = `https://www.flyingblue.com/kamino/xp-estimation/programme?origin=${origin}&destination=${destination}`;
+    
     try {
-        // 複数のCORSプロキシを順番に試す
-        const apiUrl = `https://www.flyingblue.com/kamino/xp-estimation/programme?origin=${origin}&destination=${destination}`;
+        console.log('Trying corsproxy.io...');
+        const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+        const response = await fetch(corsProxyUrl);
         
-        try {
-            console.log('Trying corsproxy.io...');
-            const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-            const response = await fetch(corsProxyUrl);
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log('Success with corsproxy.io:', data);
-                if (data && data.length > 0) {
-                    return data[0];
-                }
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Success with corsproxy.io:', data);
+            if (data && data.length > 0) {
+                return data[0];
             }
-        } catch (corsError2) {
-            console.log('corsproxy.io failed:', corsError2);
-            return new Error('All CORS proxy methods failed');
         }
-        
-    } catch (error) {
-        console.error('All CORS proxy methods failed:', error);
+        return new Error('Failed to fetch distance category');
+    } catch (corsError2) {
+        console.log('corsproxy.io failed:', corsError2);
         return new Error('All CORS proxy methods failed');
-    }
+    }        
 }
 
 const getXp = (distanceCategory, classType) =>  xpTable[distanceCategory][classType] || 0;
