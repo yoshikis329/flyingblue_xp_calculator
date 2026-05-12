@@ -45,17 +45,6 @@ const calc = async () => {
         return;
     }
 
-    if (via) {
-        console.log(`Calculating route: ${origin} -> ${via} -> ${destination}`);
-        const originViaDistanceCategory = await calcDistanceCategory(origin, via, classType);
-        const xpOriginVia = getXp(originViaDistanceCategory, classType);
-        const viaDestinationDistanceCategory = await calcDistanceCategory(via, destination, classType);
-        const xpViaDestination = getXp(viaDestinationDistanceCategory, classType);
-        const xp = xpOriginVia + xpViaDestination;
-        const pricePerXp = getPricePerXp(xp);
-        createResultElement(viaDestinationDistanceCategory, classType, xp, pricePerXp);
-    }
-
     console.log(`Calculating route: ${origin} -> ${destination}`);
     
     // 結果エリアをクリア
@@ -65,23 +54,41 @@ const calc = async () => {
     const loadingElement = document.createElement('p');
     loadingElement.innerText = '計算中...';
     document.getElementById('result').appendChild(loadingElement);
-    const distanceCategory = await calcDistanceCategory(origin, destination, classType);
 
-    const xp = getXp(distanceCategory, classType);
-    const pricePerXp = getPricePerXp(Number(document.getElementById('price').value), xp);
+    if (via) {
+        console.log(`Calculating route: ${origin} -> ${via} -> ${destination}`);
+        const xPAndPricePerXP = await calcXPAndPricePerXP(origin, via, destination, classType);
+        if (xPAndPricePerXP instanceof Error) {
+            createErrorElement();
+            return;
+        }
+        const {xp, pricePerXp} = xPAndPricePerXP;
+        createResultElement(distanceCategory, classType, xp, pricePerXp);
+        return;
+    }
 
-    // ローディング表示をクリア
-    document.getElementById('result').innerHTML = '';
+    const distanceCategory = await getDistanceCategory(origin, destination, classType);
 
     if (distanceCategory instanceof Error) {
         createErrorElement();
         return;
     }
+
+
+    const xp = getXp(distanceCategory, classType);
+    const pricePerXp = calcPricePerXp(xp);
+
+    createResultElement(distanceCategory, classType, xp, pricePerXp);
+
+    // ローディング表示をクリア
+    document.getElementById('result').innerHTML = '';
+
+
     createResultElement(distanceCategory, classType, xp, pricePerXp);
 }
 
 
-const calcDistanceCategory = async (origin, destination, classType) => {
+const getDistanceCategory = async (origin, destination, classType) => {
     try {
         // 複数のCORSプロキシを順番に試す
         const apiUrl = `https://www.flyingblue.com/kamino/xp-estimation/programme?origin=${origin}&destination=${destination}`;
@@ -112,7 +119,20 @@ const calcDistanceCategory = async (origin, destination, classType) => {
 
 const getXp = (distanceCategory, classType) =>  xpTable[distanceCategory][classType] || 0;
 
-const getPricePerXp = xp =>  Number(document.getElementById('price').value) / xp || 0;
+const calcPricePerXp = xp =>  Number(document.getElementById('price').value) / xp || 0;
+
+const calcXPAndPricePerXP = async (origin, via, destination, classType) => {
+    const originViaDistanceCategory = await getDistanceCategory(origin, via, classType);
+    const viaDestinationDistanceCategory = await getDistanceCategory(via, destination, classType);
+    if (originViaDistanceCategory instanceof Error || viaDestinationDistanceCategory instanceof Error) {
+        return new Error('距離カテゴリの取得に失敗しました');
+    }
+    const xpOriginVia = getXp(originViaDistanceCategory, classType);
+    const xpViaDestination = getXp(viaDestinationDistanceCategory, classType);
+    const xp = xpOriginVia + xpViaDestination;
+    const pricePerXp = calcPricePerXp(xp);
+    return {xp, pricePerXp};
+}
 
 const createErrorElement = () => {
     const errorElement = document.createElement('p');
