@@ -34,16 +34,29 @@ const xpTable = {
 
 const calc = async () => {
     const origin = document.getElementById('origin').value;
+    const via = document.getElementById('via').value;
     const destination = document.getElementById('destination').value;
     const classType = document.getElementById('classType').value;
-    
-    console.log(`Calculating route: ${origin} -> ${destination}`);
-    
+
+
     // 入力値チェック
     if (!origin || !destination) {
         alert('出発地と目的地を入力してください');
         return;
     }
+
+    if (via) {
+        console.log(`Calculating route: ${origin} -> ${via} -> ${destination}`);
+        const originViaDistanceCategory = await calcDistanceCategory(origin, via, classType);
+        const xpOriginVia = getXp(originViaDistanceCategory, classType);
+        const viaDestinationDistanceCategory = await calcDistanceCategory(via, destination, classType);
+        const xpViaDestination = getXp(viaDestinationDistanceCategory, classType);
+        const xp = xpOriginVia + xpViaDestination;
+        const pricePerXp = getPricePerXp(xp);
+        createResultElement(viaDestinationDistanceCategory, classType, xp, pricePerXp);
+    }
+
+    console.log(`Calculating route: ${origin} -> ${destination}`);
     
     // 結果エリアをクリア
     document.getElementById('result').innerHTML = '';
@@ -52,7 +65,23 @@ const calc = async () => {
     const loadingElement = document.createElement('p');
     loadingElement.innerText = '計算中...';
     document.getElementById('result').appendChild(loadingElement);
-    
+    const distanceCategory = await calcDistanceCategory(origin, destination, classType);
+
+    const xp = getXp(distanceCategory, classType);
+    const pricePerXp = getPricePerXp(Number(document.getElementById('price').value), xp);
+
+    // ローディング表示をクリア
+    document.getElementById('result').innerHTML = '';
+
+    if (distanceCategory instanceof Error) {
+        createErrorElement();
+        return;
+    }
+    createResultElement(distanceCategory, classType, xp, pricePerXp);
+}
+
+
+const calcDistanceCategory = async (origin, destination, classType) => {
     try {
         // 複数のCORSプロキシを順番に試す
         const apiUrl = `https://www.flyingblue.com/kamino/xp-estimation/programme?origin=${origin}&destination=${destination}`;
@@ -60,28 +89,30 @@ const calc = async () => {
         try {
             console.log('Trying corsproxy.io...');
             const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-            const response3 = await fetch(corsProxyUrl);
+            const response = await fetch(corsProxyUrl);
             
-            if (response3.ok) {
-                const data = await response3.json();
+            if (response.ok) {
+                const data = await response.json();
                 console.log('Success with corsproxy.io:', data);
                 if (data && data.length > 0) {
                     createResultElement(data[0], classType);
-                    return;
+                    return data[0];
                 }
             }
         } catch (corsError2) {
             console.log('corsproxy.io failed:', corsError2);
+            return new Error('All CORS proxy methods failed');
         }
         
     } catch (error) {
         console.error('All CORS proxy methods failed:', error);
+        return new Error('All CORS proxy methods failed');
     }
-    
-    // ローディング表示をクリア
-    document.getElementById('result').innerHTML = '';
-    createErrorElement();
 }
+
+const getXp = (distanceCategory, classType) =>  xpTable[distanceCategory][classType] || 0;
+
+const getPricePerXp = xp =>  Number(document.getElementById('price').value) / xp || 0;
 
 const createErrorElement = () => {
     const errorElement = document.createElement('p');
@@ -89,7 +120,7 @@ const createErrorElement = () => {
     document.getElementById('result').appendChild(errorElement);
 }
 
-const createResultElement = (distanceCategory, classType) => {
+const createResultElement = (distanceCategory, classType, xp, pricePerXp) => {
     // ローディング表示をクリア
     document.getElementById('result').innerHTML = '';
     
@@ -118,8 +149,6 @@ const createResultElement = (distanceCategory, classType) => {
     xpLabelTd.style.border = '1px solid black';
     xpLabelTd.style.padding = '8px';
 
-    // TODO：XP仮置きなので計算する
-    const xp = xpTable[distanceCategory][classType] || 0;
     const xpValueTd = document.createElement('td');
     xpValueTd.innerText = xp;
     xpValueTd.style.border = '1px solid black';
@@ -134,8 +163,6 @@ const createResultElement = (distanceCategory, classType) => {
     pricePerXpLabelTd.innerText = 'XP単価';
     pricePerXpLabelTd.style.border = '1px solid black';
     pricePerXpLabelTd.style.padding = '8px';
-    const priceValue = Number(document.getElementById('price').value);
-    const pricePerXp = priceValue / xp;
     const pricePerXpValueTd = document.createElement('td');
     pricePerXpValueTd.innerText = pricePerXp.toFixed(2) + '円';
     pricePerXpValueTd.style.border = '1px solid black';
