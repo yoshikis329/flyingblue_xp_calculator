@@ -31,10 +31,7 @@ const xpTable = {
     }
 };
 
-const distanceCategoryCacheKey = 'flyingblue-distance-categories';
-const distanceCategoryCacheDuration = 12 * 60 * 60 * 1000;
-const distanceCategoryRequests = new Map();
-const distanceCategoryWorkerUrl = 'https://flyingblue-xp-api.yoshikis329.workers.dev';
+let airportDataPromise;
 
 
 const calc = async () => {
@@ -73,83 +70,87 @@ const calc = async () => {
         createErrorElement(distanceCategory.message);
         return;
     }
-    const xp = getXp(distanceCategory, classType);
+    const xp = getXp(distanceCategory, classType) * 2;
     const pricePerXp = calcPricePerXp(xp);
     createResultElement(distanceCategory, classType, xp, pricePerXp);
 }
 
 
+const getAirportData = async () => {
+    if (!airportDataPromise) {
+        airportDataPromise = fetch('./airports.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`空港データの読み込みに失敗しました（HTTP ${response.status}）。`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data.airports || typeof data.airports !== 'object') {
+                    throw new Error('空港データの形式が正しくありません。');
+                }
+                return data.airports;
+            })
+            .catch(error => {
+                airportDataPromise = undefined;
+                throw error;
+            });
+    }
+    return airportDataPromise;
+}
+
 const getDistanceCategory = async (origin, destination) => {
-    const apiUrl = new URL('https://www.flyingblue.com/kamino/xp-estimation/programme');
-    apiUrl.searchParams.set('origin', origin);
-    apiUrl.searchParams.set('destination', destination);
-    const cacheKey = `${origin.toUpperCase()}-${destination.toUpperCase()}`;
-
     try {
-        const cachedCategories = JSON.parse(localStorage.getItem(distanceCategoryCacheKey) || '{}');
-        const cachedCategory = cachedCategories[cacheKey];
-        if (cachedCategory && cachedCategory.expiresAt > Date.now()) {
-            return cachedCategory.category;
+        const airports = await getAirportData();
+        const originCode = origin.trim().toUpperCase();
+        const destinationCode = destination.trim().toUpperCase();
+        const originAirport = airports[originCode];
+        const destinationAirport = airports[destinationCode];
+
+        if (!originAirport) {
+            throw new Error(`出発地の空港コード「${originCode}」が空港データにありません。`);
         }
+        if (!destinationAirport) {
+            throw new Error(`目的地の空港コード「${destinationCode}」が空港データにありません。`);
+        }
+
+        return categorizeAirports(originAirport, destinationAirport);
     } catch (error) {
-        console.warn('Could not read the distance category cache:', error);
-    }
-
-    if (distanceCategoryRequests.has(cacheKey)) {
-        return distanceCategoryRequests.get(cacheKey);
-    }
-
-    const request = fetchDistanceCategory(apiUrl, cacheKey);
-    distanceCategoryRequests.set(cacheKey, request);
-    try {
-        return await request;
-    } finally {
-        distanceCategoryRequests.delete(cacheKey);
+        console.error('Failed to determine distance category:', error);
+        return error instanceof Error ? error : new Error('距離カテゴリの計算に失敗しました。');
     }
 }
 
-const fetchDistanceCategory = async (apiUrl, cacheKey) => {
-    if (distanceCategoryWorkerUrl.includes('YOUR_SUBDOMAIN')) {
-        return new Error('Cloudflare WorkerのURLが未設定です。READMEの手順に従ってscript.jsを設定してください。');
+const categorizeAirports = (airportA, airportB) => {
+    if (airportA[2] === airportB[2]) {
+        return 'Domestic';
     }
 
-    const workerUrl = new URL(distanceCategoryWorkerUrl);
-    workerUrl.searchParams.set('origin', apiUrl.searchParams.get('origin'));
-    workerUrl.searchParams.set('destination', apiUrl.searchParams.get('destination'));
-
-    try {
-        const response = await fetch(workerUrl);
-        if (!response.ok) {
-            let detail = '';
-            try {
-                const errorBody = await response.json();
-                detail = errorBody.error ? ` ${errorBody.error}` : '';
-            } catch (error) {
-                console.warn('Could not read the Worker error response:', error);
-            }
-            throw new Error(`Cloudflare WorkerからHTTP ${response.status}が返されました。${detail}`);
-        }
-
-        const data = await response.json();
-        if (!Array.isArray(data) || !Object.hasOwn(xpTable, data[0])) {
-            throw new Error('Cloudflare Workerから想定外のデータが返されました。');
-        }
-
-        try {
-            const cachedCategories = JSON.parse(localStorage.getItem(distanceCategoryCacheKey) || '{}');
-            cachedCategories[cacheKey] = {
-                category: data[0],
-                expiresAt: Date.now() + distanceCategoryCacheDuration
-            };
-            localStorage.setItem(distanceCategoryCacheKey, JSON.stringify(cachedCategories));
-        } catch (error) {
-            console.warn('Could not update the distance category cache:', error);
-        }
-        return data[0];
-    } catch (error) {
-        console.error('Failed to fetch distance category through Cloudflare Worker:', error);
-        return error instanceof Error ? error : new Error('Cloudflare Workerへの接続に失敗しました。時間をおいて再度お試しください。');
+    const distanceMiles = calculateDistanceMiles(airportA, airportB);
+    const boundaryToleranceMiles = 1e-9;
+    if (distanceMiles < 2000 - boundaryToleranceMiles) {
+        return 'Medium';
     }
+    if (distanceMiles < 3500 - boundaryToleranceMiles) {
+        return 'Long 1';
+    }
+    if (distanceMiles < 5000 - boundaryToleranceMiles) {
+        return 'Long 2';
+    }
+    return 'Long 3';
+}
+
+const calculateDistanceMiles = (airportA, airportB) => {
+    const toRadians = degrees => degrees * Math.PI / 180;
+    const [latitudeA, longitudeA] = airportA;
+    const [latitudeB, longitudeB] = airportB;
+    const latitudeDelta = toRadians(latitudeB - latitudeA);
+    const longitudeDelta = toRadians(longitudeB - longitudeA);
+    const haversine = Math.sin(latitudeDelta / 2) ** 2
+        + Math.cos(toRadians(latitudeA)) * Math.cos(toRadians(latitudeB))
+        * Math.sin(longitudeDelta / 2) ** 2;
+    const boundedHaversine = Math.min(1, Math.max(0, haversine));
+    return 3958.7613 * 2 * Math.atan2(Math.sqrt(boundedHaversine), Math.sqrt(1 - boundedHaversine));
 }
 
 const getXp = (distanceCategory, classType) =>  xpTable[distanceCategory][classType] || 0;
@@ -167,7 +168,7 @@ const calcXPAndPricePerXP = async (origin, via, destination, classType) => {
     }
     const xpOriginVia = getXp(originViaDistanceCategory, classType);
     const xpViaDestination = getXp(viaDestinationDistanceCategory, classType);
-    const xp = xpOriginVia + xpViaDestination;
+    const xp = (xpOriginVia + xpViaDestination) * 2;
     const pricePerXp = calcPricePerXp(xp);
     return {distanceCategory: `${originViaDistanceCategory} + ${viaDestinationDistanceCategory}`, xp, pricePerXp};
 }
@@ -210,7 +211,7 @@ const createResultElement = (distanceCategory, classType, xp, pricePerXp) => {
     // XPの行
     const XpTr = document.createElement('tr');
     const xpLabelTd = document.createElement('td');
-    xpLabelTd.innerText = '片道あたりのXP';
+    xpLabelTd.innerText = '往復あたりのXP';
     xpLabelTd.style.border = '1px solid black';
     xpLabelTd.style.padding = '8px';
 

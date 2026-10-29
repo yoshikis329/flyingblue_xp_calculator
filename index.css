@@ -130,3 +130,10 @@ button:active {
     padding: 16px 0;
     font-size: 0.9rem;
 }
+
+.calculation-note {
+    margin-top: 20px;
+    color: #666;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}

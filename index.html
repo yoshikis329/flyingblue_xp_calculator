@@ -34,13 +34,18 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="price">片道あたりのチケット金額（円）</label>
-                <input type="number" id="price" placeholder="例：150000" min="0" />
+                <label for="price">往復のチケット金額（円）</label>
+                <input type="number" id="price" placeholder="例：300000" min="0" />
             </div>
             <button onclick="calc()">計算する</button>
             <div id="result"></div>
+            <p class="calculation-note">
+                距離カテゴリは、同梱の空港データにある国コードと座標から判定します。同じ国の空港間はDomestic、国際線は空港間の大圏距離（直線距離）をもとに、2,000マイル未満をMedium、2,000以上3,500マイル未満をLong 1、3,500以上5,000マイル未満をLong 2、5,000マイル以上をLong 3とします。
+                <br><br>
+                実際の飛行経路やFlying Blue独自の判定とは異なる場合があるため、結果は目安です。空港データの誤り・不足によって正確に判定できない場合もあります。
+            </p>
         </div>
     </div>
-    <script src="./script.js"></script>
+    <script src="./script.js?v=20261030-roundtrip"></script>
 </body>
 </html>

@@ -1,15 +1,22 @@
 # flyingblue_xp_calculator
-2地点の距離と航空券の金額を入力するとFlyingBlueのXPを計算するツール
+
+空港コード、座席クラス、航空券の金額からFlying BlueのXPを計算するツールです。
+金額は往復運賃を入力し、XPとXP単価も往復分で表示します。
+
 https://yoshikis329.github.io/flyingblue_xp_calculator/
 
-距離カテゴリの取得にはFlying BlueのAPIを使用します。ブラウザーから直接アクセスできないため、Cloudflare Workerを中継先として利用します。同じ区間の取得結果はブラウザー内に12時間キャッシュします。
+## 距離カテゴリの判定
 
-## Cloudflare Workerのセットアップ
+Flying BlueのAPIやプロキシは使わず、同梱の `airports.json` にある空港座標と国コードから判定します。
 
-1. Cloudflareアカウントでログインできる環境にWranglerを用意します。
-2. リポジトリのルートで `npx wrangler deploy` を実行し、Workerをデプロイします。以後 `worker.js` を変更した場合も、このコマンドでWorkerを再デプロイしてください。
-3. `script.js` を変更した場合のみ、サイトを再デプロイします。
+- 同じ国の空港間: Domestic
+- 国際線で2,000マイル未満: Medium
+- 2,000マイル以上3,500マイル未満: Long 1
+- 3,500マイル以上5,000マイル未満: Long 2
+- 5,000マイル以上: Long 3
 
-Workerはこのサイトのオリジンからのリクエストだけを許可し、ブラウザーでの成功が確認されたFlying Blue API（`www.flyingblue.com`、`lang=ja&market=JP`）に接続します。接続時にはサイトの `Origin` と `Referer` を含めます。公開プロキシの停止やレート制限を回避できますが、Flying Blue側で障害やアクセス制限が発生した場合は計算できません。Workerを変更しただけでは公開中のWorkerは変わらないため、必ず再デプロイしてください。
+距離は空港間の大圏距離（直線距離）です。飛行経路やFlying Blue独自の判定とは差が出る場合があります。境界値は重複しないよう、2,000・3,500・5,000マイルちょうどをそれぞれ次の距離カテゴリに含めます。Domesticは距離にかかわらず優先します。
 
-API応答をcurlで調べる場合は、HTTP/2ストリームエラーとAPIのHTTPエラーを区別するため `curl --http1.1 -i 'https://www.flyingblue.com/kamino/xp-estimation/programme?origin=HND&destination=PVG&lang=ja&market=JP'` を使用してください。`curl: (92)` はHTTP応答ではなく、curlとサーバー間のHTTP/2通信エラーです。
+## 空港データ
+
+`airports.json` は [OurAirports](https://ourairports.com/data/) の空港データから、IATAコードがあり定期便のある空港を抽出したものです。OurAirportsのデータはパブリックドメインで、正確性の保証はありません。データを更新する場合は同じ条件で `airports.csv` から生成してください。
