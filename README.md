@@ -10,4 +10,6 @@ https://yoshikis329.github.io/flyingblue_xp_calculator/
 2. リポジトリのルートで `npx wrangler deploy` を実行し、Workerをデプロイします。以後 `worker.js` を変更した場合も、このコマンドでWorkerを再デプロイしてください。
 3. `script.js` を変更した場合のみ、サイトを再デプロイします。
 
-Workerはこのサイトのオリジンからのリクエストだけを許可し、Flying Blueの固定APIだけに接続します。接続時にはブラウザー相当の `Origin` と `Referer` を含めます。公開プロキシの停止やレート制限を回避できますが、Flying Blue側で障害やアクセス制限が発生した場合は計算できません。Workerを変更しただけでは公開中のWorkerは変わらないため、必ず再デプロイしてください。
+Workerはこのサイトのオリジンからのリクエストだけを許可し、ブラウザーでの成功が確認されたFlying Blue API（`www.flyingblue.com`、`lang=ja&market=JP`）に接続します。接続時にはサイトの `Origin` と `Referer` を含めます。公開プロキシの停止やレート制限を回避できますが、Flying Blue側で障害やアクセス制限が発生した場合は計算できません。Workerを変更しただけでは公開中のWorkerは変わらないため、必ず再デプロイしてください。
+
+API応答をcurlで調べる場合は、HTTP/2ストリームエラーとAPIのHTTPエラーを区別するため `curl --http1.1 -i 'https://www.flyingblue.com/kamino/xp-estimation/programme?origin=HND&destination=PVG&lang=ja&market=JP'` を使用してください。`curl: (92)` はHTTP応答ではなく、curlとサーバー間のHTTP/2通信エラーです。

@@ -47,9 +47,12 @@ export default {
         const apiUrl = new URL('https://www.flyingblue.com/kamino/xp-estimation/programme');
         apiUrl.searchParams.set('origin', origin);
         apiUrl.searchParams.set('destination', destination);
+        apiUrl.searchParams.set('lang', 'ja');
+        apiUrl.searchParams.set('market', 'JP');
 
         try {
             const upstream = await fetch(apiUrl, {
+                signal: AbortSignal.timeout(12000),
                 headers: {
                     Accept: 'application/json, text/plain, */*',
                     'Accept-Language': 'en-US,en;q=0.9,ja;q=0.8',
@@ -74,6 +77,11 @@ export default {
             return jsonResponse(data, 200, responseOrigin);
         } catch (error) {
             console.error('Flying Blue API request failed:', error);
+            if (error instanceof Error && error.name === 'TimeoutError') {
+                return jsonResponse({
+                    error: 'Flying Blue did not respond within 12 seconds'
+                }, 504, responseOrigin);
+            }
             return jsonResponse({ error: 'Could not retrieve data from Flying Blue' }, 502, responseOrigin);
         }
     }
