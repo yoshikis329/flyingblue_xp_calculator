@@ -50,10 +50,20 @@ export default {
 
         try {
             const upstream = await fetch(apiUrl, {
-                headers: { Accept: 'application/json' }
+                headers: {
+                    Accept: 'application/json, text/plain, */*',
+                    'Accept-Language': 'en-US,en;q=0.9,ja;q=0.8',
+                    Origin: 'https://www.flyingblue.com',
+                    Referer: 'https://www.flyingblue.com/'
+                }
             });
             if (!upstream.ok) {
-                return jsonResponse({ error: `Flying Blue returned HTTP ${upstream.status}` }, 502, responseOrigin);
+                const detail = (await upstream.text()).slice(0, 300);
+                console.error(`Flying Blue returned HTTP ${upstream.status}:`, detail);
+                return jsonResponse({
+                    error: `Flying Blue returned HTTP ${upstream.status}`,
+                    detail
+                }, 502, responseOrigin);
             }
 
             const data = await upstream.json();
