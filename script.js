@@ -31,6 +31,11 @@ const xpTable = {
     }
 };
 
+const distanceCategoryCacheKey = 'flyingblue-distance-categories';
+const distanceCategoryCacheDuration = 12 * 60 * 60 * 1000;
+const distanceCategoryRequests = new Map();
+const distanceCategoryWorkerUrl = 'https://flyingblue-xp-api.yoshikis329.workers.dev';
+
 
 const calc = async () => {
     const origin = document.getElementById('origin').value;
@@ -54,7 +59,7 @@ const calc = async () => {
         console.log(`Calculating route: ${origin} -> ${via} -> ${destination}`);
         const resultForXpTable = await calcXPAndPricePerXP(origin, via, destination, classType);
         if (resultForXpTable instanceof Error) {
-            createErrorElement();
+            createErrorElement(resultForXpTable.message);
             return;
         }
         createResultElement(resultForXpTable.distanceCategory, classType, resultForXpTable.xp, resultForXpTable.pricePerXp);
@@ -63,9 +68,9 @@ const calc = async () => {
 
     console.log(`Calculating route: ${origin} -> ${destination}`);
 
-    const distanceCategory = await getDistanceCategory(origin, destination, classType);
+    const distanceCategory = await getDistanceCategory(origin, destination);
     if (distanceCategory instanceof Error) {
-        createErrorElement();
+        createErrorElement(distanceCategory.message);
         return;
     }
     const xp = getXp(distanceCategory, classType);
@@ -74,27 +79,77 @@ const calc = async () => {
 }
 
 
-const getDistanceCategory = async (origin, destination, classType) => {
-    // 複数のCORSプロキシを順番に試す
-    const apiUrl = `https://www.flyingblue.com/kamino/xp-estimation/programme?origin=${origin}&destination=${destination}`;
-    
+const getDistanceCategory = async (origin, destination) => {
+    const apiUrl = new URL('https://www.flyingblue.com/kamino/xp-estimation/programme');
+    apiUrl.searchParams.set('origin', origin);
+    apiUrl.searchParams.set('destination', destination);
+    const cacheKey = `${origin.toUpperCase()}-${destination.toUpperCase()}`;
+
     try {
-        console.log('Trying corsproxy.io...');
-        const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-        const response = await fetch(corsProxyUrl);
-        
-        if (response.ok) {
-            const data = await response.json();
-            console.log('Success with corsproxy.io:', data);
-            if (data && data.length > 0) {
-                return data[0];
-            }
+        const cachedCategories = JSON.parse(localStorage.getItem(distanceCategoryCacheKey) || '{}');
+        const cachedCategory = cachedCategories[cacheKey];
+        if (cachedCategory && cachedCategory.expiresAt > Date.now()) {
+            return cachedCategory.category;
         }
-        return new Error('Failed to fetch distance category');
-    } catch (corsError2) {
-        console.log('corsproxy.io failed:', corsError2);
-        return new Error('All CORS proxy methods failed');
-    }        
+    } catch (error) {
+        console.warn('Could not read the distance category cache:', error);
+    }
+
+    if (distanceCategoryRequests.has(cacheKey)) {
+        return distanceCategoryRequests.get(cacheKey);
+    }
+
+    const request = fetchDistanceCategory(apiUrl, cacheKey);
+    distanceCategoryRequests.set(cacheKey, request);
+    try {
+        return await request;
+    } finally {
+        distanceCategoryRequests.delete(cacheKey);
+    }
+}
+
+const fetchDistanceCategory = async (apiUrl, cacheKey) => {
+    if (distanceCategoryWorkerUrl.includes('YOUR_SUBDOMAIN')) {
+        return new Error('Cloudflare WorkerのURLが未設定です。READMEの手順に従ってscript.jsを設定してください。');
+    }
+
+    const workerUrl = new URL(distanceCategoryWorkerUrl);
+    workerUrl.searchParams.set('origin', apiUrl.searchParams.get('origin'));
+    workerUrl.searchParams.set('destination', apiUrl.searchParams.get('destination'));
+
+    try {
+        const response = await fetch(workerUrl);
+        if (!response.ok) {
+            let detail = '';
+            try {
+                const errorBody = await response.json();
+                detail = errorBody.error ? ` ${errorBody.error}` : '';
+            } catch (error) {
+                console.warn('Could not read the Worker error response:', error);
+            }
+            throw new Error(`Cloudflare WorkerからHTTP ${response.status}が返されました。${detail}`);
+        }
+
+        const data = await response.json();
+        if (!Array.isArray(data) || !Object.hasOwn(xpTable, data[0])) {
+            throw new Error('Cloudflare Workerから想定外のデータが返されました。');
+        }
+
+        try {
+            const cachedCategories = JSON.parse(localStorage.getItem(distanceCategoryCacheKey) || '{}');
+            cachedCategories[cacheKey] = {
+                category: data[0],
+                expiresAt: Date.now() + distanceCategoryCacheDuration
+            };
+            localStorage.setItem(distanceCategoryCacheKey, JSON.stringify(cachedCategories));
+        } catch (error) {
+            console.warn('Could not update the distance category cache:', error);
+        }
+        return data[0];
+    } catch (error) {
+        console.error('Failed to fetch distance category through Cloudflare Worker:', error);
+        return error instanceof Error ? error : new Error('Cloudflare Workerへの接続に失敗しました。時間をおいて再度お試しください。');
+    }
 }
 
 const getXp = (distanceCategory, classType) =>  xpTable[distanceCategory][classType] || 0;
@@ -102,10 +157,13 @@ const getXp = (distanceCategory, classType) =>  xpTable[distanceCategory][classT
 const calcPricePerXp = xp =>  Number(document.getElementById('price').value) / xp || 0;
 
 const calcXPAndPricePerXP = async (origin, via, destination, classType) => {
-    const originViaDistanceCategory = await getDistanceCategory(origin, via, classType);
-    const viaDestinationDistanceCategory = await getDistanceCategory(via, destination, classType);
-    if (originViaDistanceCategory instanceof Error || viaDestinationDistanceCategory instanceof Error) {
-        return new Error('距離カテゴリの取得に失敗しました');
+    const originViaDistanceCategory = await getDistanceCategory(origin, via);
+    if (originViaDistanceCategory instanceof Error) {
+        return originViaDistanceCategory;
+    }
+    const viaDestinationDistanceCategory = await getDistanceCategory(via, destination);
+    if (viaDestinationDistanceCategory instanceof Error) {
+        return viaDestinationDistanceCategory;
     }
     const xpOriginVia = getXp(originViaDistanceCategory, classType);
     const xpViaDestination = getXp(viaDestinationDistanceCategory, classType);
@@ -121,10 +179,10 @@ const createLoadingElement = () => {
     document.getElementById('result').appendChild(loadingElement);
 }
 
-const createErrorElement = () => {
+const createErrorElement = (message) => {
     document.getElementById('result').innerHTML = '';
     const errorElement = document.createElement('p');
-    errorElement.innerText = 'データの取得に失敗しました。';
+    errorElement.innerText = message || 'データの取得に失敗しました。時間をおいて再度お試しください。';
     document.getElementById('result').appendChild(errorElement);
 }
 
